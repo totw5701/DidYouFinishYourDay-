@@ -1,286 +1,151 @@
 var http = require('http');
 var fs = require('fs');
 var url = require('url');
-
-
+var qs = require('querystring');
+var template = require('./lib/template.js');
 
 var app = http.createServer(function(request,response){
     var _url = request.url;
     var queryData = url.parse(_url, true).query;
-    var title = queryData.id;
-
-    if(_url == '/'){
-      
-      title='Welcome';
-    }
-    if(_url == '/favicon.ico'){
-        response.writeHead(404);
-        response.end();
-        return;
-    }
-    response.writeHead(200);
-
-    var template = `
-    <!DOCTYPE html>
-<html lang="en">
-    <head>
-       <style>
-       
-html,
-body,
-div,
-span,
-applet,
-object,
-iframe,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-p,
-blockquote,
-pre,
-a,
-abbr,
-acronym,
-address,
-big,
-cite,
-code,
-del,
-dfn,
-em,
-img,
-ins,
-kbd,
-q,
-s,
-samp,
-small,
-strike,
-strong,
-sub,
-sup,
-tt,
-var,
-b,
-u,
-i,
-center,
-dl,
-dt,
-dd,
-ol,
-ul,
-li,
-fieldset,
-form,
-label,
-legend,
-table,
-caption,
-tbody,
-tfoot,
-thead,
-tr,
-th,
-td,
-article,
-aside,
-canvas,
-details,
-embed,
-figure,
-figcaption,
-footer,
-header,
-hgroup,
-menu,
-nav,
-output,
-ruby,
-section,
-summary,
-time,
-mark,
-audio,
-video {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  font-size: 100%;
-  font: inherit;
-  vertical-align: baseline;
-}
-/* HTML5 display-role reset for older browsers */
-article,
-aside,
-details,
-figcaption,
-figure,
-footer,
-header,
-hgroup,
-menu,
-nav,
-section {
-  display: block;
-}
-body {
-  line-height: 1;
-}
-ol,
-ul {
-  list-style: none;
-}
-blockquote,
-q {
-  quotes: none;
-}
-blockquote:before,
-blockquote:after,
-q:before,
-q:after {
-  content: "";
-  content: none;
-}
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-}
-
-input:focus {
-  outline: none;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-
-       /* Main Page */
-       .banner {
-        display: flex;
-        align-items: center;
-        border: 5px solid #303030;
-        padding: 15px;
+    var pathname = url.parse(_url, true).pathname;
+   
+    if(pathname === '/'){
+      if(queryData.id === undefined){
+         fs.readdir('./data', function(error, filelist){
+            var obj = {
+               title:'Welcome To DYFYD',
+               description:"manage your schedules :)"
+            }
+            var list = template.list(filelist);
+            var html = template.HTML("Welcome to DYFYD",
+               ``,''
+                , list
+            )
+           response.writeHead(200);
+           response.end(html);
+         });
+      }else{
+         fs.readdir('./data', function(error, filelist){
+            var list = template.list(filelist);
+            fs.readFile(`data/${queryData.id}`, 'utf8', (err, data) => {
+               var obj = JSON.parse(data)
+               var html = template.HTML(`DTFYD - ${obj.title}`,
+               ` 
+               <a class="upDate-button" href="/update?id=${obj.id}"><span>Update</span></a>
+               <form action="/delete_process" method="post">
+                  <input type="hidden" name="id" value="${obj.id}">
+                  <input class="Delete-button" type="submit" value="Delete">
+               </form>`,
+                `<div class="schedule">
+                <h1 class="schedule__title">${obj.title}</h1>
+                <p class="schedule__content">${obj.description}</p>
+                <span class="schedule__time">${obj.createTime}</span>
+               </div>`,
+               list
+               )
+           response.writeHead(200);
+           response.end(html);
+           });
+         })
       }
-      
-      #bannerMainImg {
-        width: 180px;
-        height: 140px;
-        border-radius: 15px;
-        margin-right: 30px;
+  } else if(pathname === '/create'){
+   fs.readdir('./data', function(error, filelist){
+      var obj = {
+         title:'Welcome To DYFYD',
+         description:"manage your schedules :)"
       }
+      var randomId = parseInt(Math.random() * 10000000)
+      var list = template.list(filelist);
+      var html = template.HTML(obj.title,
+               ``,
+                `<div class="schedule">
+                <form class="schedule__create-form" action="/create_process" method="post">
+                   <input type="hidden" name="id" value="${randomId}">
+                   <input type="text" name="title" placeholder="title">
+                   <textarea class="create__description" name="description" placeholder="schedule"></textarea>
+                   <input type="submit" value="Create">
+                </form>
+               </div>`,
+                list
+               )
+ 
+     response.writeHead(200);
+     response.end(html);
+   });
+  } else if(pathname === '/create_process'){
+   var body = '';
+   request.on('data', function(data){           //서버측에서 데이터를 조각조각 받는데 그 조각을 받을때마다 콜백함수를 실행하도록 세팅 되어있다.
+      body = body + data;
+    });
+   request.on('end', function(){
+      var post = qs.parse(body);
+      var id = post.id;
+      var title = post.title;
+      var description = post.description;
+      let newDate = new Date();
+      let year = newDate.getFullYear();
+      let month = newDate.getMonth() + 1;  
+      let date = newDate.getDate(); 
+      let hours = newDate.getHours();
+      let minutes = newDate.getMinutes();
+      let createTime = `${year}/${month}/${date} ${hours}:${minutes}`
+      var dbObj = JSON.stringify({id,title,description,createTime});
+      console.log(dbObj);
+      fs.writeFile(`data/${id}`, dbObj, `utf8`, function(err){       // 파일 작성이 끝나면 콜백함수를 실행한다.
+         response.writeHead(302, {Location: `/?id=${id}`});    //301은 페이지가 완전히 다른 주소로 바뀌었다는 말, 302는 이동하라는 뜻. redirection하는줄
+         response.end();
+       })
+   })
+   
+  } else if(pathname === '/update'){
       
-      .banner-title {
-        font-size: 50px;
-        font-weight: 900;
-        color: #303030;
-      }
       
-      .main-page--contents {
-        background-color: #c9c8c8;
-        border-radius: 10px;
-        padding: 20px;
-        width: 500px;
-        margin-top: 40px;
-      }
-      
-      .create-button {
-        background-color: #7c7c7c;
-        border-radius: 5px;
-        font-size: 20px;
-        font-weight: 900;
-        color: #ffffff;
-        padding: 5px;
-        margin: 5px;
-      }
-      
-      .todo-list__title {
-        font-size: 20px;
-        font-weight: 900;
-        color: #303030;
-        margin-top: 20px;
-        margin-bottom: 10px;
-      }
-      
-      .finished-list__title {
-        font-size: 20px;
-        font-weight: 900;
-        color: #303030;
-        margin-top: 10px;
-        margin-bottom: 10px;
-      }
-      
-      .schedule {
-        border: 3px solid #742e2e;
-        padding: 10px;
-        margin-top: 20px;
-        margin-bottom: 20px;
-      }
-      
-      .schedule__title {
-        font-size: 20px;
-        font-weight: 900;
-        color: #000000;
-        margin-bottom: 10px;
-      }
-      
-       
-       .frame {
-         display: flex;
-         flex-direction: column;
-         align-items: center;
-         border: 1px solid black;
-       }
-       
-       </style>
-       
-       <meta charset="UTF-8">
-       <title>DTFYD - ${queryData.id} </title>
-    </head>
+   fs.readdir('./data', function(error, filelist){
+      var list = template.list(filelist);
+      fs.readFile(`data/${queryData.id}`, 'utf8', (err, data) => {
 
-    <body>
-      <div class="frame">
-          <div class="banner">
-             <img id="bannerMainImg" src="https://media1.tenor.com/images/c03da72e43b08f4d41028410723a850d/tenor.gif?itemid=5555911">
-             <h1 class="banner-title">Did You Finish Your Day?</h1>
-          </div>
-
-          <div class="frame--main-page">
-            <div class=main-page--contents>
-
-               <a class="create-button" href="/create">Add Schedule</a>
-
-               <h1 class="todo-list__title">Left Schedule</h1>
-               <ol>
-                  <li><a href="/?id=eatWell">eat well</a></li>
-                  <li><a href="/?id=sleepWell">sleep well</a></li>
-                  <li><a href="/?id=poopWell">poop well</a></li>
-               </ol>
-
-               <h1 class="finished-list__title">Past Schedule </h1>
-               <ol>
-                  <li><a href="eatWell.html">eat well</a></li>
-                  <li><a href="sleepWell.html">sleep well</a></li>
-                  <li><a href="poopWell.html">poop well</a></li>
-               </ol>
-
-            </div>
-
-         </div>
-      </div>
-    </body>
-
-</html>
-    `;
-
-
-    response.end(template);
+         let obj = JSON.parse(data);
+         let id = obj.id;
+         var html = template.HTML(obj.title,
+               `
+               <a class="upDate-button" href="/update?id=${obj.id}"><span>Update</span></a>
+               <form action="/delete_process" method="post">
+                 <input type="hidden" name="id" value="${obj.id}">
+                 <input class="Delete-button" type="submit" value="Delete">
+               </form>`,
+                `<div class="schedule">
+                <form class="schedule__create-form" action="/create_process" method="post">
+                   <input type="hidden" name="id" value="${obj.id}">
+                   <input type="text" name="title" placeholder="title" value="${obj.title}">
+                   <textarea class="create__description" name="description" placeholder="schedule">${obj.description}</textarea>
+                   <input type="submit" value="Create">
+                </form>
+             </div>`,
+               list
+               )
+ 
+     response.writeHead(200);
+     response.end(html);
+      })     
+   });
+  
+  } else if(pathname === '/delete_process') {
+   
+   var body = '';
+   request.on('data', function(data){           //서버측에서 데이터를 조각조각 받는데 그 조각을 받을때마다 콜백함수를 실행하도록 세팅 되어있다.
+      body = body + data;
+    });
+   request.on('end', function(){
+      var post = qs.parse(body);
+      var id = post.id;
+      fs.unlinkSync(`data/${id}`);
+      response.writeHead(302, {Location: `/`});    //301은 페이지가 완전히 다른 주소로 바뀌었다는 말, 302는 이동하라는 뜻. redirection하는줄
+      response.end();
+   })
+  } else {
+    response.writeHead(404);
+    response.end("Notfound");
+  }   
  
 });
-app.listen(2000);
+app.listen(2000, function(){console.log('😒 Connection compliete')});

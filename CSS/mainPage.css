@@ -33,7 +33,10 @@
 }
 
 .schedule {
-  border: 3px solid #742e2e;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffac40;
+  border-radius: 15px;
   padding: 10px;
   margin-top: 20px;
   margin-bottom: 20px;
