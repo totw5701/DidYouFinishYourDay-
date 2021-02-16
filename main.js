@@ -90,7 +90,6 @@ var app = http.createServer(function(request,response){
       let minutes = newDate.getMinutes();
       let createTime = `${year}/${month}/${date} ${hours}:${minutes}`
       var dbObj = JSON.stringify({id,title,description,createTime});
-      console.log(dbObj);
       fs.writeFile(`data/${id}`, dbObj, `utf8`, function(err){       // 파일 작성이 끝나면 콜백함수를 실행한다.
          response.writeHead(302, {Location: `/?id=${id}`});    //301은 페이지가 완전히 다른 주소로 바뀌었다는 말, 302는 이동하라는 뜻. redirection하는줄
          response.end();
